@@ -1,4 +1,14 @@
 const TelegramBot = require('node-telegram-bot-api');
+const http = require('http');
+
+// Render serveri portni tekshirishi uchun oddiy HTTP-server
+const PORT = process.env.PORT || 10000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot is running 24/7!');
+}).listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+});
 
 // Telegram bot tokeningiz
 const token = '8920615323:AAFO-JhtcRmnkMj6iAhM1lx2VgnCJq-wrNE';
@@ -32,7 +42,7 @@ const studentList = [
     "MUYSINALIYEVA OYDINOY"
 ];
 
-// O'quvchilar davomati va jarimalarini saqlash
+// O'quvchilar davomati va jarimalari
 const studentsData = {};
 
 studentList.forEach((name, index) => {
@@ -44,7 +54,6 @@ studentList.forEach((name, index) => {
 });
 
 const bootstrap = () => {
-    // Bot buyruqlari menyusi
     bot.setMyCommands([
         { command: '/start', description: "Botni qayta ishga tushirish" },
         { command: '/list', description: "O'quvchilar ro'yxati (23 ta)" },
@@ -55,12 +64,12 @@ const bootstrap = () => {
         const text = msg.text ? msg.text.trim() : '';
         const chatId = msg.chat.id;
 
-        // /start buyrug'i
         if (text === '/start') {
             return bot.sendMessage(
                 chatId,
                 `Assalomu alaykum!\n` +
-                `👩‍🏫 **Sinf Nazoratchilari:** Islomov Diyorbek va O'qituvchi Azizova Zulxumor\n` +
+                `👮‍♂️ **Nazoratchi:** Islomov Diyorbek\n` +
+                `👩‍🏫 **O'qituvchi:** Azizova Zulxumor\n` +
                 `👥 **O'quvchilar soni:** ${studentList.length} ta\n\n` +
                 `📋 O'quvchilar ro'yxati uchun: /list\n` +
                 `📊 Umumiy davomat hisoboti uchun: /status\n\n` +
@@ -69,7 +78,6 @@ const bootstrap = () => {
             );
         }
 
-        // /list buyrug'i
         if (text === '/list') {
             let message = `📋 **SINF O'QUVCHILARI RO'YXATI (${studentList.length} TA O'QUVCHI):**\n\n`;
             for (const id in studentsData) {
@@ -79,7 +87,6 @@ const bootstrap = () => {
             return bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
         }
 
-        // /status buyrug'i
         if (text === '/status') {
             let report = `📊 **DAVOMAT VA JARIMALAR HISOBOTI:**\n*(Nazoratda: Islomov Diyorbek & O'qituvchi Azizova Zulxumor)*\n\n`;
             for (const id in studentsData) {
@@ -89,7 +96,6 @@ const bootstrap = () => {
             return bot.sendMessage(chatId, report, { parse_mode: 'Markdown' });
         }
 
-        // Kiritilgan ID raqami bo'yicha davomat qilish (1-23)
         if (studentsData[text]) {
             const student = studentsData[text];
             student.absences += 1;
@@ -106,7 +112,6 @@ const bootstrap = () => {
             return bot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
         }
 
-        // Tushunarsiz xabar kelganda
         bot.sendMessage(chatId, "Iltimos, o'quvchi ID raqamini (1-23) kiriting yoki /list buyrug'idan foydalaning.");
     });
 };
