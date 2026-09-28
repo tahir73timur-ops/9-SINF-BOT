@@ -1,4 +1,4 @@
-const TelegramBot = require('node-telegram-bot-api');
+const TelegramBot = require('8920615323:AAHCQAPhdh05BP2g8yjP5oK9vWeBMFxUyNo');
 const http = require('http');
 
 // Render serveri uchun HTTP-server (24/7 rejim)
