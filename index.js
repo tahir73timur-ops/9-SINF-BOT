@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 
-// Render serveri uchun HTTP-server
+// Render serveri uchun HTTP-server (24/7 rejim)
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -13,7 +13,9 @@ http.createServer((req, res) => {
 const token = '8920615323:AAFO-JhtcRmnkMj6iAhM1lx2VgnCJq-wrNE';
 const bot = new TelegramBot(token, { polling: true });
 
-let TEACHER_CHAT_ID = null;
+// Faqat 2 ta mas'ul kuzatuvchi (Islomov Diyorbek va Azizova Zulxumor)
+// Har biringiz botga bir marta /set_admin deb yozsangiz, ID-ingiz saqlanadi
+const ADMIN_IDS = []; 
 
 const studentList = [
     "ABDUOLIMOV ASLIDDIN", "ABDUVAQQOSOV JASUR", "ALMATOV HUSHNUD",
@@ -35,8 +37,8 @@ const awaitingRegistration = {};
 
 bot.setMyCommands([
     { command: '/start', description: "Botni qayta ishga tushirish" },
+    { command: '/set_admin', description: "Kuzatuvchi/Admin sifatida ulanish" },
     { command: '/register', description: "O'quvchini ulash" },
-    { command: '/set_teacher', description: "O'qituvchini ulash" },
     { command: '/list', description: "O'quvchilar ro'yxati" },
     { command: '/status', description: "Davomat hisoboti" }
 ]);
@@ -45,11 +47,21 @@ bot.on('message', async (msg) => {
     const text = msg.text ? msg.text.trim() : '';
     const chatId = msg.chat.id;
 
-    if (text === '/set_teacher') {
-        TEACHER_CHAT_ID = chatId;
-        return bot.sendMessage(chatId, "✅ Siz muvaffaqiyatli **O'qituvchi/Nazoratchi** sifatida belgilandingiz.");
+    // 1. Admin/Kuzatuvchi biriktirish (Faqat 2 kishi qo'shila oladi)
+    if (text === '/set_admin') {
+        if (!ADMIN_IDS.includes(chatId)) {
+            if (ADMIN_IDS.length < 2) {
+                ADMIN_IDS.push(chatId);
+                return bot.sendMessage(chatId, "✅ Siz **mas'ul kuzatuvchi** sifatida biriktirildingiz!");
+            } else {
+                return bot.sendMessage(chatId, "⚠️ 2 ta kuzatuvchi allaqachon biriktirilgan (Islomov Diyorbek va Azizova Zulxumor).");
+            }
+        } else {
+            return bot.sendMessage(chatId, "ℹ️ Siz allaqachon kuzatuvchisiz.");
+        }
     }
 
+    // 2. Start buyrug'i (Hamma uchun ko'rinadi)
     if (text === '/start') {
         return bot.sendMessage(
             chatId,
@@ -58,12 +70,13 @@ bot.on('message', async (msg) => {
             `👩‍🏫 **O'qituvchi:** Azizova Zulxumor\n\n` +
             `📋 /list - O'quvchilar ro'yxati\n` +
             `📌 /register - O'quvchi profilini ulash\n` +
-            `👨‍🏫 /set_teacher - O'qituvchi profilini ulash\n` +
+            `🔑 /set_admin - Kuzatuvchi profilini ulash\n` +
             `📊 /status - Davomat hisoboti`,
             { parse_mode: 'Markdown' }
         );
     }
 
+    // 3. O'quvchilar registratsiyasi (/register)
     if (text === '/register') {
         awaitingRegistration[chatId] = true;
         return bot.sendMessage(chatId, "Iltimos, ismingiz to'g'risidagi **ID raqamingizni** kiriting (1-23):");
@@ -80,11 +93,16 @@ bot.on('message', async (msg) => {
         }
     }
 
+    // --- QUYIDAGI BUYRUQLAR FAQAT 2 TA KUZATUVCHI (ADMIN) UCHUN ISHLAYDI ---
+    if (!ADMIN_IDS.includes(chatId)) {
+        return bot.sendMessage(chatId, "⛔️ Kechirasiz, davomatni belgilash va ko'rish faqat mas'ul kuzatuvchilar uchun ajratilgan.");
+    }
+
     if (text === '/list') {
         let message = `📋 **O'QUVCHILAR RO'YXATI:**\n\n`;
         for (const id in studentsData) {
             const st = studentsData[id];
-            const status = st.telegramId ? "🟢 (Telegram ulangan)" : "🔴 (Telegram ulanmagan)";
+            const status = st.telegramId ? "🟢 (Ulangan)" : "🔴 (Ulanmagan)";
             message += `**${id}**. ${st.name} ${status}\n`;
         }
         message += "\n👉 Darsga kelmagan o'quvchining **ID raqamini** yuboring:";
@@ -100,21 +118,24 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, report, { parse_mode: 'Markdown' });
     }
 
+    // ID yuborilganda kelmadi deb belgilash
     if (studentsData[text]) {
         const student = studentsData[text];
         student.absences += 1;
         let response = `❌ **${student.name}** darsga kelmadi deb belgilandi! (Jami: ${student.absences} marta)\n`;
 
+        // O'quvchining shaxsiy Telegramiga xabar yuborish
         if (student.telegramId) {
             bot.sendMessage(student.telegramId, `⚠️ **OGOHLANTIRISH!** Siz bugun darsga kelmadingiz. Jami dars qoldirganingiz: ${student.absences} marta.`).catch(() => {});
         }
 
+        // 3 marta va undan oshib ketsa mas'ullarga xabar yuborish
         if (student.absences >= 3) {
             student.fines += 1;
-            response += `\n🚨 **3 TAYDAN OSHDI!** O'qituvchiga xabar yuborildi.`;
-            if (TEACHER_CHAT_ID) {
-                bot.sendMessage(TEACHER_CHAT_ID, `🚨 **DIQQAT!** O'quvchi **${student.name}** 3 martadan ko'p dars qoldirdi! (Jami: ${student.absences} marta)`).catch(() => {});
-            }
+            response += `\n🚨 **3 TAYDAN OSHDI!** Mas'ullarga ogohlantirish yuborildi.`;
+            ADMIN_IDS.forEach(adminId => {
+                bot.sendMessage(adminId, `🚨 **DIQQAT!** O'quvchi **${student.name}** 3 martadan ko'p dars qoldirdi! (Jami: ${student.absences} marta)`).catch(() => {});
+            });
         }
         return bot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
     }
